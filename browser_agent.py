@@ -32,7 +32,16 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 # --- Constants ---
-WEBSITES = ["https://techcrunch.com/", "https://www.theverge.com/", "https://arstechnica.com/"]
+WEBSITES = [
+    "https://techcrunch.com/",
+    "https://www.theverge.com/",
+    "https://arstechnica.com/",
+    "https://www.wired.com/",
+    "https://www.engadget.com/",
+    "https://gizmodo.com/",
+    "https://www.cnet.com/tech/",
+    "https://thenextweb.com/"
+]
 SENT_LINKS_FILE = "sent_links.txt"
 
 # --- Scraping Functions ---
@@ -60,15 +69,17 @@ def scrape_techcrunch(html):
     """
     articles = []
     soup = BeautifulSoup(html, "html.parser")
-    # TechCrunch often uses <a> tags with class 'post-block__title__link' for headlines
-    for link in soup.find_all("a", class_="post-block__title__link"):
-        title = link.get_text(strip=True)
-        url = link.get("href")
-        if title and url:
-            # Ensure the URL is absolute
-            if not url.startswith("http"):
-                url = "https://techcrunch.com" + url
-            articles.append({"title": title, "url": url})
+    # Updated selector: Look for links within <h2> tags, a common pattern for headlines.
+    for h2 in soup.find_all("h2"):
+        link = h2.find("a")
+        if link and link.has_attr("href"):
+            title = link.get_text(strip=True)
+            url = link.get("href")
+            if title and url:
+                # Ensure the URL is absolute, just in case
+                if not url.startswith("http"):
+                    url = "https://techcrunch.com" + url
+                articles.append({"title": title, "url": url})
     print(f"Scraped {len(articles)} articles from TechCrunch.")
     return articles
 
@@ -113,6 +124,105 @@ def scrape_arstechnica(html):
     print(f"Scraped {len(articles)} articles from Ars Technica.")
     return articles
 
+def scrape_wired(html):
+    """
+    Scrapes headlines and links from Wired's HTML content.
+    """
+    articles = []
+    soup = BeautifulSoup(html, "html.parser")
+    # Wired often uses <a> tags inside <h2> elements for headlines
+    for h2 in soup.find_all("h2"):
+        link = h2.find("a")
+        if link and link.has_attr("href"):
+            title = link.get_text(strip=True)
+            url = link["href"]
+            if title and url:
+                # Ensure the URL is absolute
+                if not url.startswith("http"):
+                    url = "https://www.wired.com" + url
+                articles.append({"title": title, "url": url})
+    print(f"Scraped {len(articles)} articles from Wired.")
+    return articles
+
+def scrape_engadget(html):
+    """
+    Scrapes headlines and links from Engadget's HTML content.
+    """
+    articles = []
+    soup = BeautifulSoup(html, "html.parser")
+    # Engadget also often uses <a> tags inside <h2> elements for headlines
+    for h2 in soup.find_all("h2"):
+        link = h2.find("a")
+        if link and link.has_attr("href"):
+            title = link.get_text(strip=True)
+            # Engadget links are often relative, so we need to build the full URL
+            url = link["href"]
+            if title and url:
+                if not url.startswith("http"):
+                    url = "https://www.engadget.com" + url
+                articles.append({"title": title, "url": url})
+    print(f"Scraped {len(articles)} articles from Engadget.")
+    return articles
+
+def scrape_gizmodo(html):
+    """
+    Scrapes headlines and links from Gizmodo's HTML content.
+    """
+    articles = []
+    soup = BeautifulSoup(html, "html.parser")
+    # Gizmodo often uses <h2> tags for headlines.
+    for h2 in soup.find_all("h2"):
+        link = h2.find("a")
+        if link and link.has_attr("href"):
+            title = link.get_text(strip=True)
+            url = link["href"]
+            if title and url:
+                # Ensure the URL is absolute
+                if not url.startswith("http"):
+                    url = "https://gizmodo.com" + url
+                articles.append({"title": title, "url": url})
+    print(f"Scraped {len(articles)} articles from Gizmodo.")
+    return articles
+
+def scrape_cnet(html):
+    """
+    Scrapes headlines and links from CNET's HTML content.
+    """
+    articles = []
+    soup = BeautifulSoup(html, "html.parser")
+    # CNET can use a variety of tags, but looking for links in <h2> is a good start.
+    for h2 in soup.find_all("h2"):
+        link = h2.find("a")
+        if link and link.has_attr("href"):
+            title = link.get_text(strip=True)
+            url = link["href"]
+            if title and url:
+                # CNET links are usually relative
+                if not url.startswith("http"):
+                    url = "https://www.cnet.com" + url
+                articles.append({"title": title, "url": url})
+    print(f"Scraped {len(articles)} articles from CNET.")
+    return articles
+
+def scrape_thenextweb(html):
+    """
+    Scrapes headlines and links from The Next Web's HTML content.
+    """
+    articles = []
+    soup = BeautifulSoup(html, "html.parser")
+    # The Next Web also tends to use <h2> for its headlines.
+    for h2 in soup.find_all("h2"):
+        link = h2.find("a")
+        if link and link.has_attr("href"):
+            title = link.get_text(strip=True)
+            url = link["href"]
+            if title and url:
+                if not url.startswith("http"):
+                    url = "https://thenextweb.com" + url
+                articles.append({"title": title, "url": url})
+    print(f"Scraped {len(articles)} articles from The Next Web.")
+    return articles
+
 def scrape_articles_from_sites():
     """
     Iterates through the WEBSITES list, fetches HTML, and scrapes articles.
@@ -129,6 +239,16 @@ def scrape_articles_from_sites():
             all_articles.extend(scrape_theverge(html))
         elif "arstechnica.com" in url:
             all_articles.extend(scrape_arstechnica(html))
+        elif "wired.com" in url:
+            all_articles.extend(scrape_wired(html))
+        elif "engadget.com" in url:
+            all_articles.extend(scrape_engadget(html))
+        elif "gizmodo.com" in url:
+            all_articles.extend(scrape_gizmodo(html))
+        elif "cnet.com" in url:
+            all_articles.extend(scrape_cnet(html))
+        elif "thenextweb.com" in url:
+            all_articles.extend(scrape_thenextweb(html))
 
     return all_articles
 
