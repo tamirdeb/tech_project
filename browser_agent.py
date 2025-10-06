@@ -234,6 +234,38 @@ def scrape_thenextweb(html):
     print(f"Scraped {len(articles)} articles from The Next Web.")
     return articles
 
+def send_summary_email(status_message):
+    """
+    Sends a summary email indicating the script ran but found no new articles.
+    """
+    if not all([SENDER_EMAIL, SENDER_APP_PASSWORD, RECIPIENT_EMAIL]) or \
+       "your_email@gmail.com" in SENDER_EMAIL or "your_app_password" in SENDER_APP_PASSWORD:
+        print("Error: Email credentials are not fully configured. Cannot send summary email.")
+        return False
+
+    subject = "Browser Agent Run Summary"
+    body = f"The browser detection agent completed its run.\n\nStatus: {status_message}"
+
+    msg = MIMEMultipart()
+    msg["From"] = SENDER_EMAIL
+    msg["To"] = RECIPIENT_EMAIL
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        print("Sending summary email...")
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(SENDER_EMAIL, SENDER_APP_PASSWORD)
+            server.send_message(msg)
+        print("Summary email sent successfully!")
+        return True
+    except smtplib.SMTPAuthenticationError:
+        print("Error: SMTP authentication failed. Please check your SENDER_EMAIL and SENDER_APP_PASSWORD.")
+    except Exception as e:
+        print(f"An unexpected error occurred while sending summary email: {e}")
+
+    return False
+
 def scrape_articles_from_sites():
     """
     Iterates through the WEBSITES list, fetches HTML, and scrapes articles.
@@ -350,26 +382,36 @@ def main():
     articles = scrape_articles_from_sites()
 
     if not articles:
+        log_activity("Agent run finished. No articles were scraped.")
         print("No articles were scraped. Exiting.")
         return
 
     filtered_articles = filter_articles(articles)
 
-    if not filtered_articles:
-        print("No new browser launch articles to process.")
-        return
+    new_articles_to_notify = [
+        article for article in filtered_articles if article["url"] not in sent_links
+    ]
 
-    for article in filtered_articles:
-        if article["url"] not in sent_links:
-            print(f"New article found: {article['title']}. Preparing to send notification.")
+    notifications_sent = 0
+    if new_articles_to_notify:
+        print(f"Found {len(new_articles_to_notify)} new articles to process.")
+        for article in new_articles_to_notify:
             email_sent = send_email_notification(article)
             if email_sent:
-                log_message = f"Notification sent for article: \"{article['title']}\" | URL: {article['url']}"
-                log_activity(log_message)
+                notifications_sent += 1
                 save_sent_link(article["url"])
-                print(f"Link saved to {SENT_LINKS_FILE} and logged.")
-        else:
-            print(f"Skipping already notified article: {article['title']}")
+                print(f"Link saved for: {article['title']}")
+
+    # If no notifications were sent, send a summary email
+    if notifications_sent == 0:
+        summary_message = "Agent run finished. No new articles found."
+        send_summary_email(summary_message)
+        log_activity(summary_message)
+        print(summary_message)
+    else:
+        summary_message = f"Agent run finished. Sent notifications for {notifications_sent} new article(s)."
+        log_activity(summary_message)
+        print(summary_message)
 
     print("Agent run complete.")
 
