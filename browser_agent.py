@@ -30,6 +30,7 @@ from bs4 import BeautifulSoup
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from datetime import datetime
 
 # --- Constants ---
 WEBSITES = [
@@ -43,6 +44,16 @@ WEBSITES = [
     "https://thenextweb.com/"
 ]
 SENT_LINKS_FILE = "sent_links.txt"
+LOG_FILE = "agent_log.txt"
+
+# --- Logging Function ---
+def log_activity(message):
+    """
+    Appends a message with a timestamp to the log file.
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(LOG_FILE, "a") as f:
+        f.write(f"[{timestamp}] {message}\n")
 
 # --- Scraping Functions ---
 
@@ -150,14 +161,14 @@ def scrape_engadget(html):
     """
     articles = []
     soup = BeautifulSoup(html, "html.parser")
-    # Engadget also often uses <a> tags inside <h2> elements for headlines
-    for h2 in soup.find_all("h2"):
-        link = h2.find("a")
+    # Updated Selector: Trying <h3> tags as they are also common for article headlines.
+    for h3 in soup.find_all("h3"):
+        link = h3.find("a")
         if link and link.has_attr("href"):
             title = link.get_text(strip=True)
-            # Engadget links are often relative, so we need to build the full URL
             url = link["href"]
             if title and url:
+                # Engadget links are often relative, so we need to build the full URL
                 if not url.startswith("http"):
                     url = "https://www.engadget.com" + url
                 articles.append({"title": title, "url": url})
@@ -190,9 +201,9 @@ def scrape_cnet(html):
     """
     articles = []
     soup = BeautifulSoup(html, "html.parser")
-    # CNET can use a variety of tags, but looking for links in <h2> is a good start.
-    for h2 in soup.find_all("h2"):
-        link = h2.find("a")
+    # Updated Selector: Trying <h3> as an alternative to <h2> for headlines.
+    for h3 in soup.find_all("h3"):
+        link = h3.find("a")
         if link and link.has_attr("href"):
             title = link.get_text(strip=True)
             url = link["href"]
@@ -353,8 +364,10 @@ def main():
             print(f"New article found: {article['title']}. Preparing to send notification.")
             email_sent = send_email_notification(article)
             if email_sent:
+                log_message = f"Notification sent for article: \"{article['title']}\" | URL: {article['url']}"
+                log_activity(log_message)
                 save_sent_link(article["url"])
-                print(f"Link saved to {SENT_LINKS_FILE}: {article['url']}")
+                print(f"Link saved to {SENT_LINKS_FILE} and logged.")
         else:
             print(f"Skipping already notified article: {article['title']}")
 
