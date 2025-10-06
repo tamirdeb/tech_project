@@ -31,6 +31,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
+from pathlib import Path
 
 # --- Constants ---
 WEBSITES = [
@@ -44,7 +45,8 @@ WEBSITES = [
     "https://thenextweb.com/"
 ]
 SENT_LINKS_FILE = "sent_links.txt"
-LOG_FILE = "agent_log.txt"
+# Save the log file in the user's home directory to avoid permission issues.
+LOG_FILE = Path.home() / "agent_log.txt"
 
 # --- Logging Function ---
 def log_activity(message):
