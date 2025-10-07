@@ -1,0 +1,56 @@
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background-color: #f0f8ff;
+}
+
+#game-container {
+    width: 80%;
+    margin: 0 auto;
+    border: 2px solid #ccc;
+    padding: 20px;
+    background-color: #fff;
+}
+
+#letter-display {
+    font-size: 100px;
+    margin-bottom: 20px;
+}
+
+#animals-container {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.animal {
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.animal:hover {
+    transform: scale(1.1);
+}
+
+.animal img {
+    width: 150px;
+    height: 150px;
+}
+
+.animal .letter {
+    font-size: 50px;
+}
+
+#feedback {
+    font-size: 24px;
+    margin-top: 20px;
+    font-weight: bold;
+}
+
+.correct {
+    color: green;
+}
+
+.incorrect {
+    color: red;
+}
