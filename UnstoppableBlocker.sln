@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientUI", "ClientUI\ClientUI.csproj", "{9DD9102A-BC9C-4398-BB16-049293782D45}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnstoppableServiceB", "UnstoppableServiceB\UnstoppableServiceB.csproj", "{072A0861-6D3D-47FF-B21D-4A00AE0F32EF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9DD9102A-BC9C-4398-BB16-049293782D45}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9DD9102A-BC9C-4398-BB16-049293782D45}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9DD9102A-BC9C-4398-BB16-049293782D45}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9DD9102A-BC9C-4398-BB16-049293782D45}.Release|Any CPU.Build.0 = Release|Any CPU
+		{072A0861-6D3D-47FF-B21D-4A00AE0F32EF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{072A0861-6D3D-47FF-B21D-4A00AE0F32EF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{072A0861-6D3D-47FF-B21D-4A00AE0F32EF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{072A0861-6D3D-47FF-B21D-4A00AE0F32EF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
