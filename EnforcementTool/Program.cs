@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -26,6 +27,9 @@ namespace EnforcementTool
         [DllImport("user32.dll")]
         static extern int GetSystemMetrics(int nIndex);
 
+        [DllImport("user32.dll")]
+        static extern bool SetProcessDPIAware();
+
         const int SW_HIDE = 0;
         const int SW_SHOW = 5;
 
@@ -35,6 +39,7 @@ namespace EnforcementTool
         const int SM_CYVIRTUALSCREEN = 79;
 
         // --- Configuration ---
+        private static readonly bool SafeMode = true; // Set to false for production
         private static readonly string AppName = "EnforcementTool";
         // SHA256 Hash for "password"
         private static readonly string OverrideHash = "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8";
@@ -47,6 +52,9 @@ namespace EnforcementTool
 
         static async Task Main(string[] args)
         {
+            // Fix DPI Scaling issues
+            SetProcessDPIAware();
+
             // 1. Persistence
             EnsurePersistence();
 
@@ -104,6 +112,10 @@ namespace EnforcementTool
             Console.WriteLine("==========================================");
             Console.WriteLine("   STRICT ENFORCEMENT PROTOCOL INITIATING");
             Console.WriteLine("==========================================");
+            if (SafeMode)
+            {
+                Console.WriteLine("   [SAFE MODE ENABLED: NO SHUTDOWN]");
+            }
             Console.WriteLine($"You have 30 seconds to abort.");
             Console.WriteLine("Enter Override Code:");
 
@@ -174,16 +186,10 @@ namespace EnforcementTool
         {
             string tessDataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "tessdata");
 
-            // Ensure tessdata exists or log error
-            if (!Directory.Exists(tessDataPath))
-            {
-                 // In a hidden console app, we can't easily show error.
-                 // We'll just attempt to run and catch.
-                 // Ideally, user ensures tessdata is present.
-            }
-
             try
             {
+                await EnsureTessDataExists(tessDataPath);
+
                 // Initialize Tesseract Engine
                 using var engine = new TesseractEngine(tessDataPath, "eng", EngineMode.Default);
 
@@ -219,8 +225,31 @@ namespace EnforcementTool
             catch (Exception ex)
             {
                 // Fatal error (e.g. Tesseract not found)
-                // Since window is hidden, write to a log file?
-                File.WriteAllText("error_log.txt", ex.ToString());
+                // Write to a log file
+                File.WriteAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "fatal_error.txt"), ex.ToString());
+            }
+        }
+
+        private static async Task EnsureTessDataExists(string tessDataPath)
+        {
+            if (!Directory.Exists(tessDataPath))
+            {
+                Directory.CreateDirectory(tessDataPath);
+            }
+
+            string trainedDataPath = Path.Combine(tessDataPath, "eng.traineddata");
+            if (!File.Exists(trainedDataPath))
+            {
+                try
+                {
+                    using var client = new HttpClient();
+                    var data = await client.GetByteArrayAsync("https://github.com/tesseract-ocr/tessdata_fast/raw/main/eng.traineddata");
+                    await File.WriteAllBytesAsync(trainedDataPath, data);
+                }
+                catch (Exception ex)
+                {
+                   throw new Exception("Failed to download Tesseract data.", ex);
+                }
             }
         }
 
@@ -299,21 +328,38 @@ namespace EnforcementTool
 
         private static void Punish()
         {
-            try
+            if (SafeMode)
             {
-                Process.Start(new ProcessStartInfo("shutdown", "/s /f /t 0")
+                // Safe Mode: Beep and Log
+                Console.Beep(1000, 500);
+                string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                string logFile = Path.Combine(desktopPath, "punishment_log.txt");
+                string message = $"{DateTime.Now}: Violation detected! Shutdown prevented by Safe Mode.{Environment.NewLine}";
+                try
                 {
-                    CreateNoWindow = true,
-                    UseShellExecute = false
-                });
+                    File.AppendAllText(logFile, message);
+                }
+                catch { } // Ignore logging errors
             }
-            catch
+            else
             {
-                // If punishment fails...
-            }
-            finally
-            {
-                Environment.Exit(0);
+                // Punishment: Shutdown
+                try
+                {
+                    Process.Start(new ProcessStartInfo("shutdown", "/s /f /t 0")
+                    {
+                        CreateNoWindow = true,
+                        UseShellExecute = false
+                    });
+                }
+                catch
+                {
+                    // If punishment fails...
+                }
+                finally
+                {
+                    Environment.Exit(0);
+                }
             }
         }
     }
