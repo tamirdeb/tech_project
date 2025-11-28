@@ -1,0 +1,14 @@
+D:\EnforcementTool\obj\Release\net8.0-windows\EnforcementTool.GeneratedMSBuildEditorConfig.editorconfig
+D:\EnforcementTool\obj\Release\net8.0-windows\EnforcementTool.AssemblyInfoInputs.cache
+D:\EnforcementTool\obj\Release\net8.0-windows\EnforcementTool.AssemblyInfo.cs
+D:\EnforcementTool\obj\Release\net8.0-windows\EnforcementTool.csproj.CoreCompileInputs.cache
+D:\EnforcementTool\bin\Release\net8.0-windows\EnforcementTool.exe
+D:\EnforcementTool\bin\Release\net8.0-windows\EnforcementTool.deps.json
+D:\EnforcementTool\bin\Release\net8.0-windows\EnforcementTool.runtimeconfig.json
+D:\EnforcementTool\bin\Release\net8.0-windows\EnforcementTool.dll
+D:\EnforcementTool\bin\Release\net8.0-windows\EnforcementTool.pdb
+D:\EnforcementTool\obj\Release\net8.0-windows\EnforcementTool.dll
+D:\EnforcementTool\obj\Release\net8.0-windows\refint\EnforcementTool.dll
+D:\EnforcementTool\obj\Release\net8.0-windows\EnforcementTool.pdb
+D:\EnforcementTool\obj\Release\net8.0-windows\EnforcementTool.genruntimeconfig.cache
+D:\EnforcementTool\obj\Release\net8.0-windows\ref\EnforcementTool.dll
