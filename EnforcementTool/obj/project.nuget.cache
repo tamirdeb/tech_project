@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "I0cySqoNSWQ=",
+  "success": true,
+  "projectFilePath": "D:\\EnforcementTool\\EnforcementTool.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Tamir Debono\\.nuget\\packages\\microsoft.win32.systemevents\\8.0.0\\microsoft.win32.systemevents.8.0.0.nupkg.sha512",
+    "C:\\Users\\Tamir Debono\\.nuget\\packages\\system.drawing.common\\8.0.0\\system.drawing.common.8.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}
