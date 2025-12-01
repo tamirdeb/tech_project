@@ -169,14 +169,13 @@ fun MainScreenContent(
 fun PinLockScreen(correctPin: String, onUnlock: () -> Unit, activity: FragmentActivity) {
     var enteredPin by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
+    var biometricErrorMessage by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     
-    // Check if biometric authentication is available
+    // Check if strong biometric authentication is available (fingerprint, face with depth)
     val biometricManager = remember { BiometricManager.from(context) }
     val isBiometricAvailable = remember {
-        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or 
-                            BiometricManager.Authenticators.BIOMETRIC_WEAK
-        biometricManager.canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
+        biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
     }
     
     // Biometric prompt callback - stable reference to avoid recreations
@@ -184,17 +183,32 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit, activity: FragmentAc
         object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                 super.onAuthenticationSucceeded(result)
+                biometricErrorMessage = null
                 onUnlock()
             }
             
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                 super.onAuthenticationError(errorCode, errString)
-                // User can still try PIN
+                // Show error message for permanent failures (lockout, hardware unavailable, etc.)
+                when (errorCode) {
+                    BiometricPrompt.ERROR_LOCKOUT,
+                    BiometricPrompt.ERROR_LOCKOUT_PERMANENT -> {
+                        biometricErrorMessage = "Biometric locked. Use PIN."
+                    }
+                    BiometricPrompt.ERROR_USER_CANCELED,
+                    BiometricPrompt.ERROR_NEGATIVE_BUTTON -> {
+                        // User cancelled - no error message needed
+                        biometricErrorMessage = null
+                    }
+                    else -> {
+                        biometricErrorMessage = errString.toString()
+                    }
+                }
             }
             
             override fun onAuthenticationFailed() {
                 super.onAuthenticationFailed()
-                // User can still try PIN
+                // Single attempt failed, user can retry automatically
             }
         }
     }
@@ -202,6 +216,7 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit, activity: FragmentAc
     // Function to trigger biometric authentication - wrapped to avoid recreations
     val showBiometricPrompt = remember(activity, context, biometricCallback) {
         {
+            biometricErrorMessage = null
             val executor = ContextCompat.getMainExecutor(context)
             val biometricPrompt = BiometricPrompt(activity, executor, biometricCallback)
             
@@ -209,6 +224,7 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit, activity: FragmentAc
                 .setTitle("Unlock Watchdog")
                 .setSubtitle("Use biometric to unlock (PIN recovery)")
                 .setNegativeButtonText("Use PIN instead")
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
                 .build()
             
             biometricPrompt.authenticate(promptInfo)
@@ -304,6 +320,13 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit, activity: FragmentAc
                 Spacer(modifier = Modifier.height(24.dp))
                 TextButton(onClick = showBiometricPrompt) {
                     Text("Forgot PIN? Use Fingerprint")
+                }
+                biometricErrorMessage?.let { errorMsg ->
+                    Text(
+                        text = errorMsg,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
         }
