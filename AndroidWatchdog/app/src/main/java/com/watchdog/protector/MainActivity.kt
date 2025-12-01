@@ -9,29 +9,10 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -39,252 +20,216 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 
-// Watchdog Protector - Main Activity
+// הוסר: import com.watchdog.protector.ui.theme.WatchdogProtectorTheme (השורה הבעייתית)
+
 class MainActivity : ComponentActivity() {
+    private lateinit var prefsManager: PrefsManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        prefsManager = PrefsManager(this)
+
         setContent {
-            WatchdogApp()
+            // תיקון: שימוש ב-MaterialTheme הסטנדרטי במקום WatchdogProtectorTheme החסר
+            MaterialTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    MainAppContent(prefsManager)
+                }
+            }
         }
     }
 }
 
 @Composable
-fun WatchdogApp() {
-    val context = LocalContext.current
-    val prefsManager = remember { PrefsManager(context) }
+fun MainAppContent(prefsManager: PrefsManager) {
+    // אם יש PIN שמור בזיכרון -> מתחילים נעולים. אחרת -> פתוחים.
+    var isLocked by remember { mutableStateOf(prefsManager.hasPin()) }
 
-    // Check if a Password is set.
-    val storedPassword = remember { prefsManager.userPassword }
-
-    // Default locked if password exists
-    var isLocked by remember { mutableStateOf(!storedPassword.isNullOrEmpty()) }
-
-    var showSetPasswordDialog by remember { mutableStateOf(false) }
-    var showUnlockDialog by remember { mutableStateOf(false) }
-
-    MaterialTheme {
-        MainScreenContent(
-            prefsManager = prefsManager,
-            isLocked = isLocked,
-            hasPassword = !storedPassword.isNullOrEmpty(),
-            onUnlockClick = { showUnlockDialog = true },
-            onSetPasswordClick = { showSetPasswordDialog = true }
+    if (isLocked) {
+        PinLockScreen(
+            storedPin = prefsManager.pinCode ?: "",
+            onUnlock = { isLocked = false }
         )
-
-        if (showSetPasswordDialog) {
-            SetPasswordDialog(
-                onDismiss = { showSetPasswordDialog = false },
-                onPasswordSet = { newPassword ->
-                    prefsManager.userPassword = newPassword
-                    showSetPasswordDialog = false
-                    // Re-lock immediately after setting password as per requirements ("will be grayed out")
-                    isLocked = true
-                }
-            )
-        }
-
-        if (showUnlockDialog) {
-            UnlockDialog(
-                correctPassword = storedPassword ?: "",
-                onDismiss = { showUnlockDialog = false },
-                onUnlock = {
-                    isLocked = false
-                    showUnlockDialog = false
-                }
-            )
-        }
+    } else {
+        SettingsScreen(prefsManager)
     }
 }
 
 @Composable
-fun MainScreenContent(
-    prefsManager: PrefsManager,
-    isLocked: Boolean,
-    hasPassword: Boolean,
-    onUnlockClick: () -> Unit,
-    onSetPasswordClick: () -> Unit
-) {
-    val context = LocalContext.current
-    var isDebugMode by remember { mutableStateOf(prefsManager.isDebugMode) }
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Watchdog Protector",
-                style = MaterialTheme.typography.headlineMedium
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Debug Mode Toggle
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "Debug Mode (Log Screens)")
-                Switch(
-                    checked = isDebugMode,
-                    enabled = !isLocked,
-                    onCheckedChange = {
-                        isDebugMode = it
-                        prefsManager.isDebugMode = it
-                    }
-                )
-            }
-            Text(
-                text = "Enable this to see Package/Class names in Logcat and Toast messages.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Accessibility Settings Button
-            Button(
-                onClick = {
-                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                    context.startActivity(intent)
-                },
-                enabled = !isLocked,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Open Accessibility Settings")
-            }
-            Text(
-                text = "Enable 'Watchdog Protector' service here.",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            // Battery Optimization Button
-            Button(
-                onClick = {
-                    requestIgnoreBatteryOptimizations(context)
-                },
-                enabled = !isLocked,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Ignore Battery Optimizations")
-            }
-             Text(
-                text = "Required for persistence on Samsung devices.",
-                style = MaterialTheme.typography.bodySmall,
-                 modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            // Security Action Button
-            if (isLocked) {
-                OutlinedButton(
-                    onClick = onUnlockClick,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Unlock Settings")
-                }
-            } else {
-                OutlinedButton(
-                    onClick = onSetPasswordClick,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(if (hasPassword) "Change Security Password" else "Set Security Password")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SetPasswordDialog(onDismiss: () -> Unit, onPasswordSet: (String) -> Unit) {
-    var password by remember { mutableStateOf("") }
-    val isValid = password.length >= 25
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Set Security Password") },
-        text = {
-            Column {
-                Text("Enter a secure password (minimum 25 characters) to lock the app:")
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    isError = password.isNotEmpty() && !isValid,
-                    supportingText = {
-                        if (password.isNotEmpty() && !isValid) {
-                            Text("Must be at least 25 characters (${password.length}/25)")
-                        }
-                    }
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onPasswordSet(password) },
-                enabled = isValid
-            ) {
-                Text("Save & Lock")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-@Composable
-fun UnlockDialog(correctPassword: String, onDismiss: () -> Unit, onUnlock: () -> Unit) {
-    var password by remember { mutableStateOf("") }
+fun PinLockScreen(storedPin: String, onUnlock: () -> Unit) {
+    var inputPin by remember { mutableStateOf("") }
     var isError by remember { mutableStateOf(false) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Unlock Settings") },
-        text = {
-            Column {
-                Text("Enter your password to enable settings:")
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = {
-                        password = it
-                        isError = false
-                    },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    visualTransformation = PasswordVisualTransformation(),
-                    singleLine = true,
-                    isError = isError,
-                    supportingText = {
-                        if (isError) Text("Incorrect Password")
-                    }
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(text = "Watchdog Locked", style = MaterialTheme.typography.headlineMedium)
+        Spacer(modifier = Modifier.height(24.dp))
+
+        OutlinedTextField(
+            value = inputPin,
+            onValueChange = {
+                inputPin = it
+                isError = false
+            },
+            label = { Text("Enter PIN") },
+            singleLine = true,
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            isError = isError
+        )
+
+        if (isError) {
+            Text(
+                text = "Incorrect PIN",
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = {
+                if (inputPin == storedPin) {
+                    onUnlock()
+                } else {
+                    isError = true
+                    inputPin = ""
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Unlock")
+        }
+    }
+}
+
+@Composable
+fun SettingsScreen(prefsManager: PrefsManager) {
+    val context = LocalContext.current
+    var isDebug by remember { mutableStateOf(prefsManager.isDebugMode) }
+    var showSetPinDialog by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
+        Text("Control Panel", style = MaterialTheme.typography.headlineLarge)
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // --- מתג Debug Mode ---
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Debug Mode", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = "Enable to view logs.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.secondary
                 )
             }
+            Switch(
+                checked = isDebug,
+                onCheckedChange = {
+                    isDebug = it
+                    prefsManager.isDebugMode = it
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+        Divider()
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // --- כפתור הגדרת סיסמה ---
+        Text(text = "Security", style = MaterialTheme.typography.titleMedium)
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Button(
+            onClick = { showSetPinDialog = true },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (prefsManager.hasPin()) "Change PIN Code" else "Set PIN Code")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // --- כפתורי מערכת (נגישות וסוללה) ---
+        OutlinedButton(
+            onClick = {
+                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                context.startActivity(intent)
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Open Accessibility Settings")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val intent = Intent()
+                    val packageName = context.packageName
+                    val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+                    if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                        intent.action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+                        intent.data = Uri.parse("package:$packageName")
+                        context.startActivity(intent)
+                    } else {
+                        android.widget.Toast.makeText(context, "Already ignored optimizations", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Ignore Battery Optimizations")
+        }
+    }
+
+    // --- דיאלוג להגדרת סיסמה ---
+    if (showSetPinDialog) {
+        SetPinDialog(
+            onDismiss = { showSetPinDialog = false },
+            onSave = { newPin ->
+                prefsManager.pinCode = newPin
+                showSetPinDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+fun SetPinDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var text by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Set New PIN") },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                label = { Text("Enter 4-digit PIN") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true
+            )
         },
         confirmButton = {
             Button(
                 onClick = {
-                    if (password == correctPassword) {
-                        onUnlock()
-                    } else {
-                        isError = true
+                    if (text.isNotEmpty()) {
+                        onSave(text)
                     }
                 }
             ) {
-                Text("Unlock")
+                Text("Save")
             }
         },
         dismissButton = {
@@ -293,19 +238,4 @@ fun UnlockDialog(correctPassword: String, onDismiss: () -> Unit, onUnlock: () ->
             }
         }
     )
-}
-
-fun requestIgnoreBatteryOptimizations(context: Context) {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        val intent = Intent()
-        val packageName = context.packageName
-        val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
-            intent.action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
-            intent.data = Uri.parse("package:$packageName")
-            context.startActivity(intent)
-        } else {
-             android.widget.Toast.makeText(context, "Already ignored optimizations", android.widget.Toast.LENGTH_SHORT).show()
-        }
-    }
 }
