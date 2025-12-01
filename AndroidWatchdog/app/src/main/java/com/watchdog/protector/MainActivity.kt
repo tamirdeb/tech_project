@@ -166,6 +166,12 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit) {
     val context = LocalContext.current
     val prefsManager = remember { PrefsManager(context) }
 
+    // Clear expired lockout state on initialization
+    val initialLockoutEndTime = prefsManager.lockoutEndTime
+    if (initialLockoutEndTime > 0L && initialLockoutEndTime <= System.currentTimeMillis()) {
+        prefsManager.resetFailedAttempts()
+    }
+
     var enteredPin by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
     var failedAttempts by remember { mutableIntStateOf(prefsManager.failedPinAttempts) }
@@ -178,7 +184,13 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit) {
             currentTime = System.currentTimeMillis()
             kotlinx.coroutines.delay(1000L)
         }
-        currentTime = System.currentTimeMillis()
+        // Clear lockout state when it expires
+        if (lockoutEndTime > 0L) {
+            currentTime = System.currentTimeMillis()
+            lockoutEndTime = 0L
+            failedAttempts = 0
+            prefsManager.resetFailedAttempts()
+        }
     }
 
     val isLockedOut = lockoutEndTime > currentTime
@@ -275,9 +287,6 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit) {
                                                     val newLockoutEnd = System.currentTimeMillis() + lockoutDurationMs
                                                     lockoutEndTime = newLockoutEnd
                                                     prefsManager.lockoutEndTime = newLockoutEnd
-                                                    // Reset failed attempts after lockout is triggered
-                                                    failedAttempts = 0
-                                                    prefsManager.failedPinAttempts = 0
                                                 }
                                             }
                                         }
