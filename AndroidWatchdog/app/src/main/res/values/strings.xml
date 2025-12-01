@@ -1,4 +1,0 @@
-<resources>
-    <string name="app_name">Watchdog Protector</string>
-    <string name="accessibility_service_description">Protects against specific toxic screens that crash other apps.</string>
-</resources>
