@@ -7,8 +7,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,18 +26,20 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            WatchdogApp()
+            WatchdogApp(activity = this)
         }
     }
 }
 
 @Composable
-fun WatchdogApp() {
+fun WatchdogApp(activity: FragmentActivity) {
     val context = LocalContext.current
     val prefsManager = remember { PrefsManager(context) }
 
@@ -49,7 +52,8 @@ fun WatchdogApp() {
         if (isLocked && !storedPin.isNullOrEmpty()) {
             PinLockScreen(
                 correctPin = storedPin!!,
-                onUnlock = { isLocked = false }
+                onUnlock = { isLocked = false },
+                activity = activity
             )
         } else {
             MainScreenContent(
@@ -162,9 +166,46 @@ fun MainScreenContent(
 }
 
 @Composable
-fun PinLockScreen(correctPin: String, onUnlock: () -> Unit) {
+fun PinLockScreen(correctPin: String, onUnlock: () -> Unit, activity: FragmentActivity) {
     var enteredPin by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    
+    // Check if biometric authentication is available
+    val biometricManager = BiometricManager.from(context)
+    val isBiometricAvailable = remember {
+        biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
+    }
+    
+    // Function to trigger biometric authentication
+    fun showBiometricPrompt() {
+        val executor = ContextCompat.getMainExecutor(context)
+        val biometricPrompt = BiometricPrompt(activity, executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    onUnlock()
+                }
+                
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    // User can still try PIN
+                }
+                
+                override fun onAuthenticationFailed() {
+                    super.onAuthenticationFailed()
+                    // User can still try PIN
+                }
+            })
+        
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Unlock Watchdog")
+            .setSubtitle("Use biometric to unlock (PIN recovery)")
+            .setNegativeButtonText("Use PIN instead")
+            .build()
+        
+        biometricPrompt.authenticate(promptInfo)
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -248,6 +289,14 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit) {
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
+            }
+            
+            // Biometric unlock option (for PIN recovery)
+            if (isBiometricAvailable) {
+                Spacer(modifier = Modifier.height(24.dp))
+                TextButton(onClick = { showBiometricPrompt() }) {
+                    Text("Forgot PIN? Use Fingerprint")
+                }
             }
         }
     }
