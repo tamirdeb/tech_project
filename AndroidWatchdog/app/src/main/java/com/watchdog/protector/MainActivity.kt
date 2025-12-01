@@ -214,10 +214,10 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit, activity: FragmentAc
     }
     
     // Function to trigger biometric authentication - wrapped to avoid recreations
-    val showBiometricPrompt = remember(activity, context, biometricCallback) {
+    val showBiometricPrompt = remember(activity, biometricCallback) {
         {
             biometricErrorMessage = null
-            val executor = ContextCompat.getMainExecutor(context)
+            val executor = ContextCompat.getMainExecutor(activity)
             val biometricPrompt = BiometricPrompt(activity, executor, biometricCallback)
             
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
@@ -319,7 +319,7 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit, activity: FragmentAc
             if (isBiometricAvailable) {
                 Spacer(modifier = Modifier.height(24.dp))
                 TextButton(onClick = showBiometricPrompt) {
-                    Text("Forgot PIN? Use Fingerprint")
+                    Text("Forgot PIN? Use Biometric")
                 }
                 biometricErrorMessage?.let { errorMsg ->
                     Text(
