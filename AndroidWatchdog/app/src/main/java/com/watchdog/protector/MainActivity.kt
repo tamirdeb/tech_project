@@ -172,39 +172,47 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit, activity: FragmentAc
     val context = LocalContext.current
     
     // Check if biometric authentication is available
-    val biometricManager = BiometricManager.from(context)
+    val biometricManager = remember { BiometricManager.from(context) }
     val isBiometricAvailable = remember {
-        biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or 
+                            BiometricManager.Authenticators.BIOMETRIC_WEAK
+        biometricManager.canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
     }
     
-    // Function to trigger biometric authentication
-    fun showBiometricPrompt() {
-        val executor = ContextCompat.getMainExecutor(context)
-        val biometricPrompt = BiometricPrompt(activity, executor,
-            object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    super.onAuthenticationSucceeded(result)
-                    onUnlock()
-                }
-                
-                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                    super.onAuthenticationError(errorCode, errString)
-                    // User can still try PIN
-                }
-                
-                override fun onAuthenticationFailed() {
-                    super.onAuthenticationFailed()
-                    // User can still try PIN
-                }
-            })
-        
-        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Watchdog")
-            .setSubtitle("Use biometric to unlock (PIN recovery)")
-            .setNegativeButtonText("Use PIN instead")
-            .build()
-        
-        biometricPrompt.authenticate(promptInfo)
+    // Biometric prompt callback - stable reference to avoid recreations
+    val biometricCallback = remember {
+        object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                super.onAuthenticationSucceeded(result)
+                onUnlock()
+            }
+            
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                super.onAuthenticationError(errorCode, errString)
+                // User can still try PIN
+            }
+            
+            override fun onAuthenticationFailed() {
+                super.onAuthenticationFailed()
+                // User can still try PIN
+            }
+        }
+    }
+    
+    // Function to trigger biometric authentication - wrapped to avoid recreations
+    val showBiometricPrompt = remember(activity, context, biometricCallback) {
+        {
+            val executor = ContextCompat.getMainExecutor(context)
+            val biometricPrompt = BiometricPrompt(activity, executor, biometricCallback)
+            
+            val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Unlock Watchdog")
+                .setSubtitle("Use biometric to unlock (PIN recovery)")
+                .setNegativeButtonText("Use PIN instead")
+                .build()
+            
+            biometricPrompt.authenticate(promptInfo)
+        }
     }
 
     Surface(
@@ -294,7 +302,7 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit, activity: FragmentAc
             // Biometric unlock option (for PIN recovery)
             if (isBiometricAvailable) {
                 Spacer(modifier = Modifier.height(24.dp))
-                TextButton(onClick = { showBiometricPrompt() }) {
+                TextButton(onClick = showBiometricPrompt) {
                     Text("Forgot PIN? Use Fingerprint")
                 }
             }
