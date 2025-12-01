@@ -7,8 +7,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,18 +26,20 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            WatchdogApp()
+            WatchdogApp(activity = this)
         }
     }
 }
 
 @Composable
-fun WatchdogApp() {
+fun WatchdogApp(activity: FragmentActivity) {
     val context = LocalContext.current
     val prefsManager = remember { PrefsManager(context) }
 
@@ -49,7 +52,8 @@ fun WatchdogApp() {
         if (isLocked && !storedPin.isNullOrEmpty()) {
             PinLockScreen(
                 correctPin = storedPin!!,
-                onUnlock = { isLocked = false }
+                onUnlock = { isLocked = false },
+                activity = activity
             )
         } else {
             MainScreenContent(
@@ -162,9 +166,70 @@ fun MainScreenContent(
 }
 
 @Composable
-fun PinLockScreen(correctPin: String, onUnlock: () -> Unit) {
+fun PinLockScreen(correctPin: String, onUnlock: () -> Unit, activity: FragmentActivity) {
     var enteredPin by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
+    var biometricErrorMessage by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    
+    // Check if strong biometric authentication is available (fingerprint, face with depth)
+    val biometricManager = remember { BiometricManager.from(context) }
+    val isBiometricAvailable = remember {
+        biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS
+    }
+    
+    // Biometric prompt callback - stable reference to avoid recreations
+    val biometricCallback = remember {
+        object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                super.onAuthenticationSucceeded(result)
+                biometricErrorMessage = null
+                onUnlock()
+            }
+            
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                super.onAuthenticationError(errorCode, errString)
+                // Show error message for permanent failures (lockout, hardware unavailable, etc.)
+                when (errorCode) {
+                    BiometricPrompt.ERROR_LOCKOUT,
+                    BiometricPrompt.ERROR_LOCKOUT_PERMANENT -> {
+                        biometricErrorMessage = "Biometric locked. Use PIN."
+                    }
+                    BiometricPrompt.ERROR_USER_CANCELED,
+                    BiometricPrompt.ERROR_NEGATIVE_BUTTON -> {
+                        // User cancelled - no error message needed
+                        biometricErrorMessage = null
+                    }
+                    else -> {
+                        biometricErrorMessage = errString.toString()
+                    }
+                }
+            }
+            
+            override fun onAuthenticationFailed() {
+                super.onAuthenticationFailed()
+                // Single attempt failed, user can retry automatically
+            }
+        }
+    }
+    
+    // Function to trigger biometric authentication - wrapped to avoid recreations
+    val showBiometricPrompt = remember(activity, biometricCallback) {
+        {
+            biometricErrorMessage = null
+            val executor = ContextCompat.getMainExecutor(activity)
+            val biometricPrompt = BiometricPrompt(activity, executor, biometricCallback)
+            
+            val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Unlock Watchdog")
+                .setSubtitle("Use biometric to unlock (PIN recovery)")
+                .setNegativeButtonText("Use PIN instead")
+                .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                .build()
+            
+            biometricPrompt.authenticate(promptInfo)
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -248,6 +313,21 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit) {
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
+            }
+            
+            // Biometric unlock option (for PIN recovery)
+            if (isBiometricAvailable) {
+                Spacer(modifier = Modifier.height(24.dp))
+                TextButton(onClick = showBiometricPrompt) {
+                    Text("Forgot PIN? Use Biometric")
+                }
+                biometricErrorMessage?.let { errorMsg ->
+                    Text(
+                        text = errorMsg,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         }
     }
