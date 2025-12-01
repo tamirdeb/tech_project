@@ -163,8 +163,28 @@ fun MainScreenContent(
 
 @Composable
 fun PinLockScreen(correctPin: String, onUnlock: () -> Unit) {
+    val context = LocalContext.current
+    val prefsManager = remember { PrefsManager(context) }
+
     var enteredPin by remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
+    var failedAttempts by remember { mutableIntStateOf(prefsManager.failedPinAttempts) }
+    var lockoutEndTime by remember { mutableLongStateOf(prefsManager.lockoutEndTime) }
+    var currentTime by remember { mutableLongStateOf(System.currentTimeMillis()) }
+
+    // Update current time every second to show countdown
+    LaunchedEffect(lockoutEndTime) {
+        while (lockoutEndTime > System.currentTimeMillis()) {
+            currentTime = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1000L)
+        }
+        currentTime = System.currentTimeMillis()
+    }
+
+    val isLockedOut = lockoutEndTime > currentTime
+    val remainingLockoutSeconds = if (isLockedOut) ((lockoutEndTime - currentTime) / 1000).toInt() else 0
+    val maxAttempts = 5
+    val lockoutDurationMs = 30_000L // 30 seconds lockout
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -196,8 +216,17 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit) {
                 }
             }
 
-            if (showError) {
-                Text("Incorrect PIN", color = MaterialTheme.colorScheme.error)
+            if (isLockedOut) {
+                Text(
+                    "Too many failed attempts. Try again in ${remainingLockoutSeconds}s",
+                    color = MaterialTheme.colorScheme.error
+                )
+            } else if (showError) {
+                val attemptsRemaining = maxAttempts - failedAttempts
+                Text(
+                    "Incorrect PIN ($attemptsRemaining attempts remaining)",
+                    color = MaterialTheme.colorScheme.error
+                )
             } else {
                 Spacer(modifier = Modifier.height(20.dp)) // Placeholder for error text
             }
@@ -219,7 +248,7 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit) {
                 ) {
                     for (key in row) {
                         if (key.isNotEmpty()) {
-                            KeypadButton(key) {
+                            KeypadButton(key, enabled = !isLockedOut) {
                                 if (key == "<") {
                                     if (enteredPin.isNotEmpty()) {
                                         enteredPin = enteredPin.dropLast(1)
@@ -232,10 +261,24 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit) {
                                         // Auto-check if length is 4
                                         if (enteredPin.length == 4) {
                                             if (enteredPin == correctPin) {
+                                                // Reset failed attempts on successful unlock
+                                                prefsManager.resetFailedAttempts()
                                                 onUnlock()
                                             } else {
                                                 enteredPin = ""
+                                                failedAttempts++
+                                                prefsManager.failedPinAttempts = failedAttempts
                                                 showError = true
+
+                                                // Check if we should trigger lockout
+                                                if (failedAttempts >= maxAttempts) {
+                                                    val newLockoutEnd = System.currentTimeMillis() + lockoutDurationMs
+                                                    lockoutEndTime = newLockoutEnd
+                                                    prefsManager.lockoutEndTime = newLockoutEnd
+                                                    // Reset failed attempts after lockout is triggered
+                                                    failedAttempts = 0
+                                                    prefsManager.failedPinAttempts = 0
+                                                }
                                             }
                                         }
                                     }
@@ -254,16 +297,23 @@ fun PinLockScreen(correctPin: String, onUnlock: () -> Unit) {
 }
 
 @Composable
-fun KeypadButton(text: String, onClick: () -> Unit) {
+fun KeypadButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(80.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onClick),
+            .background(
+                if (enabled) MaterialTheme.colorScheme.surfaceVariant
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            )
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = text, style = MaterialTheme.typography.headlineLarge)
+        Text(
+            text = text,
+            style = MaterialTheme.typography.headlineLarge,
+            color = if (enabled) Color.Unspecified else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        )
     }
 }
 
