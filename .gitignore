@@ -1,0 +1,22 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.vs/
+.vs/
+
+## Test Results
+TestResults/
+test-results/
+
+## Playwright
+playwright-report/
+
+## IDE
+.idea/
+*.sln.DotSettings.user
+
+## ExtentReports output
+Reports/
